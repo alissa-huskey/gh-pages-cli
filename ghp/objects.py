@@ -152,7 +152,6 @@ class Deploy(Object):
             master_sha=(None, True, Sha),
         )
 
-
     @cached_property
     def commit(self):
         """Return Commit object"""

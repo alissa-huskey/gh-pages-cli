@@ -18,6 +18,10 @@ class Ok(IntEnum):
     fail   = -1  # error, failure
     error  = -2  # invalid state name
 
+    def __bool__(self):
+        """Return True for truthy Ok status"""
+        return self.value > 0
+
 
 # error, failure, pending, in_progress, queued, or success
 # queued, in_progress, or completed.
