@@ -1,0 +1,13 @@
+2020-12-06 get USER and REPO from git config (git remote get-url origin)
+2020-12-06 make SRC_DIR and DATA_DIR configurable
+2020-12-06 move DATA_DIR out of python-class/tmp
+2020-12-06 ensure consistent deploy status naming
+2020-12-06 replace Style class with templating
+2020-12-06 Style.header() should work directly with Writer
+2020-12-06 add --quiet flag and disable App.msg() messages
+2020-12-06 Add --dry-run flag
+2020-12-06 Consistent request.object, request.object_request, request.data naming
+2020-12-06 request prod URL and check for <title>Python Class .*</title>
+2020-12-06 Review color modules (colorama, colorful, blessed), remove unneeded
+2020-12-06 tests
+2020-12-06 readme
