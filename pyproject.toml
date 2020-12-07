@@ -3,6 +3,9 @@ name = "ghp"
 version = "0.1.0"
 description = "CLI utility for querying the Github API for status of Pages/Actions"
 authors = ["Alissa Huskey <alissa.huskey@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/alissa-huskey/gh-pages-cli"
+homepage = "https://github.com/alissa-huskey/gh-pages-cli"
 
 [tool.poetry.dependencies]
 python = "^3.8"
