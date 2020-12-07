@@ -10,7 +10,6 @@ from click import style
 import tabulate as tabulate_module
 from tabulate import tabulate
 
-from . import DATA_DIR
 from .app import App
 from .requests import (CommitRequest, DeploysRequest, JobsRequest,
                        JobLogRequest, PagesRequest, PagesBuildsRequest,
@@ -33,7 +32,6 @@ def debug(app):
     builds = PagesBuildsRequest()
     build = builds.data[0]
 
-    app.info(DATA_DIR, prefix="DATA_DIR")
     app.info(deploys.dirname, prefix="deploys.dirname")
     app.info(deploys.dirpath, prefix="deploys.dirpath")
     app.info(deploys.filepath, prefix="deploys.filepath")
@@ -275,7 +273,7 @@ def show_failed_job_stats(job):
         ("Job", f"[{style(job.status.name, fg='red')}] {job.id}"),
         ("Step", f"[{style(job.last_step.status.name, fg='red')}] {app.style.step(job.last_step, len(str(job.last_step.number)))}"),
         ("Log", str(job.log_request.filepath.relative_to(Path.cwd())).ljust(minwidth)),
-        ("URL", app.term.link(job.url, f"{USER}/{REPO} > actions")),
+        ("URL", app.term.link(job.url, f"{App.APP.repo} > actions")),
     ]
 
     app.writer.indent()
@@ -284,6 +282,10 @@ def show_failed_job_stats(job):
 
 
 @click.command()
+@click.option("--repo", "-r",
+              help="Github repo connected to Github Pages. (ie 'executablebooks/jupyter-book')")
+@click.option("--data-root", "-d",
+              help="Where to save downloaded data files.")
 @click.option("--local", "-l", is_flag=True, default=False,
               help="Don't download updates, even for pending states.'")
 @click.option("--refresh", "-r", is_flag=True, default=False,
@@ -310,5 +312,10 @@ def main(**kwargs):
     app.writer.paginate()
 
 
+def run():
+    """Run the click command"""
+    main(auto_envvar_prefix="GHP")
+
+
 if __name__ == "__main__":
-    main()
+    run()

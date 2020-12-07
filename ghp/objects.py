@@ -237,7 +237,7 @@ class Job(ChildObject):
     @property
     def url(self):
         """Return the URL to view the Job on github.com"""
-        return f"https://github.com/{USER}/{REPO}/runs/{self.id}?check_suite_focus=true"
+        return f"https://github.com/{App.APP.repo}/runs/{self.id}?check_suite_focus=true"
 
     @cached_property
     def log_request(self):

@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
 import json
+from subprocess import run as shell_run
 
-from . import DATA_DIR
 from .app import App
 from .objects import (Commit, Deploy, DeployStatus, Job, Log, LogLine, Pages,
                       PagesBuild, Run, Step)
@@ -85,7 +85,7 @@ class Request(ABC, Downloadable):
     """Application object"""
     APP: App
 
-    """Name of the directory under {DATA_DIR} to store json files."""
+    """Name of the directory under {App.data_dir} to store json files."""
     dirname: str
 
     """The parsed data received from the Github API."""
@@ -143,7 +143,7 @@ class Request(ABC, Downloadable):
     @abstractmethod
     def endpoint(self) -> str:
         """A string containing the part of the Github API endpoint for this
-           request type that follows {REPO}.
+           request type that follows {App.APP.repo}.
 
            For example, if the full endpoint for the class was:
            /repos/{owner}/{repo}/commits/{ref}
@@ -156,7 +156,7 @@ class Request(ABC, Downloadable):
     def dirpath(self):
         """Returns a Path object to the directory where the json files for this
            API request type are stored."""
-        return DATA_DIR.joinpath(self.dirname)
+        return App.APP.data_dir.joinpath(self.dirname)
 
     def exists(self):
         """Return True if there are files downoaded for this request type."""
@@ -199,7 +199,7 @@ class Request(ABC, Downloadable):
            Uses the `gh` CLI tool to avoid dealing with authentication.
            Raises CalledProcessError if the request fails.
         """
-        result = shell_run(["gh", "api", f"/repos/{USER}/{REPO}/{self.endpoint}"],
+        result = shell_run(["gh", "api", f"/repos/{App.APP.repo}/{self.endpoint}"],
                      capture_output=True)
         result.check_returncode()
         data = json.loads(result.stdout.decode())
@@ -305,7 +305,7 @@ class PagesRequest(Request, Dynamic):
 
     @property
     def endpoint(self):
-        """API endpoint following REPO"""
+        """API endpoint following App.repo"""
         return "pages"
 
 
@@ -338,7 +338,7 @@ class JobLogRequest(ChildRequest, Finite):
         """
         with self.filepath.open("w") as fp:
             result = shell_run(
-                ["gh", "api", f"/repos/{USER}/{REPO}/{self.endpoint}"],
+                ["gh", "api", f"/repos/{App.APP.repo}/{self.endpoint}"],
                 stdout=fp)
             result.check_returncode()
 
@@ -428,5 +428,5 @@ class StatusRequest(ChildRequest, Finite):
 
     @property
     def endpoint(self):
-        """API endpoint following REPO"""
+        """API endpoint following App.repo"""
         return f"deployments/{self.parent.id}/statuses"

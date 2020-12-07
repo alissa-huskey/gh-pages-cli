@@ -1,12 +1,16 @@
 """App module"""
 
 from functools import cached_property
-from typing import Any
 from itertools import chain
+from pathlib import Path
+import re
+from subprocess import run as shell_run
+from sys import stderr
+from typing import Any
 
 from blessed.terminal import Terminal
-from click import style
 import click
+from click import style
 from more_itertools import always_iterable
 
 from .states import Ok
@@ -21,25 +25,92 @@ class App():
     """Application object"""
     APP: Any
 
-    def __init__(self, local=False, refresh=False, verbose=False,):
+    def __init__(self, repo=None, data_root=None, local=False, refresh=False, verbose=False):
         """Initializer
            Set option attrubites and print messages about enabled options.
         """
-        self.__class__.APP = self
-
-        self.term = Terminal()
-        self.writer = Writer()
-        self.width, self.height = click.get_terminal_size()
+        # set attrs from options
+        self.data_root = data_root
+        self.repo = repo
         self.force_local = local
         self.refresh = refresh
         self.verbose = verbose
 
+        # validate options
         if self.force_local and self.refresh:
-            abort("--local and --refresh are exclusive")
+            self.abort("The --local and --refresh flags are mutually exclusive.")
 
+        # set globals
+        self.__class__.APP = self
+        self.term = Terminal()
+        self.writer = Writer()
+        self.width, self.height = click.get_terminal_size()
+
+        # user messages
+        self.info(self.repo, prefix="Repo")
         self.msg(self.style.mode("verbose", self.verbose))
         self.msg(self.style.mode("local", self.force_local))
         self.msg(self.style.mode("refresh", self.refresh))
+
+    @property
+    def repo(self):
+        """Return _repo"""
+        return self._repo
+
+    @repo.setter
+    def repo(self, value: str):
+        """Set _repo. default: parse from url of origin remote
+        accepts strings like:
+            - alissa-huskey/python-class
+            - https://github.com/mgutz/ansi
+            - git@github.com:alissa-huskey/gh-pages-cli.git
+            - https://github.com/bats-core/bats-core.git
+        """
+        # get the default value from remote origin url in current dir
+        if not value:
+            res = shell_run(["git", "remote", "get-url", "origin"],
+                              capture_output=True)
+            if res.returncode != 0:
+                return
+            value = res.stdout.decode().strip()
+
+        # remove trailing .git
+        if value.endswith(".git"):
+            value = value[:-4]
+
+        # parse repo from full URI
+        if match := re.search(r"github.com[/:](?P<repo>.+)$", value):
+            value = match.group("repo")
+
+        if not value:
+            self.abort("Repo is not set, and unable to get from git.\n"
+                       "      Please set GHP_REPO env var or use the --repo flag.")
+
+        self._repo = value
+
+    @property
+    def data_root(self):
+        """Return _data_root"""
+        return self._data_root
+
+    @data_root.setter
+    def data_root(self, value):
+        """Set _data_root to Path object, default ~/.ghp"""
+        if value:
+            value = Path(value).resolve()
+        if not value:
+            value = Path.home().joinpath(".ghp")
+
+        if not value.parent and value.parent.is_dir():
+            abort(f"Invalid path to data_root: {value}")
+
+        self._data_root = value
+
+    @property
+    def data_dir(self):
+        """Return a Path object to the data dir for this repo"""
+        data_dir = self.data_root.joinpath(*self.repo.split("/"))
+        return data_dir
 
     def msg(self, *args):
         """Print user message"""
@@ -47,7 +118,8 @@ class App():
         if not [a for a in args if a]:
             return
 
-        print(style(">", fg="cyan"), *args)
+        text = " ".join(args)
+        print(style(">", fg="cyan"), style(text, fg="bright_black", bold=False))
 
     def info(self, *args, multi=False, prefix=None):
         """Print info message if in verbose mode.
@@ -70,18 +142,21 @@ class App():
 
         line = [style("[Info]", fg="cyan")]
         if prefix:
-            line.append(f"{colorful.yellow}{prefix:<12}{colorful.reset}:")
-        print(*line, *args, file=stderr)
+            line.append(style("{:<12}".format(prefix), fg="yellow"))
+
+        text = style(" ".join(args), fg="bright_black")
+        print(*line, text, file=stderr)
 
     def abort(self, *args):
         """Print an error message and exit with status code 1"""
-        print(colorful.red("Error"), *args, file=stderr)
+        print(style("Error", fg="red"), *args, file=stderr)
         exit(1)
 
     @cached_property
     def style(self):
         """Return Style object"""
         return Style()
+
 
 class Writer():
     """Writer class to manage indentation and keep a buffer of text to print."""
@@ -234,7 +309,8 @@ class Style():
     def mode(self, name, enabled) -> str:
         """Return message indicating a mode was enabled"""
         if enabled:
-            return f"{name.capitalize()} mode enabled."
+            return click.style(f"{name.capitalize()} mode enabled.",
+                               fg="bright_black")
 
     def step(self, step, width=2) -> str:
         """Format a job step"""
@@ -242,5 +318,3 @@ class Style():
         if step:
             num, desc = step.number, step.desc[0:20]
         return f"{num:>{width}} {desc}"
-
-

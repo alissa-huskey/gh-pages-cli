@@ -1,2 +1,7 @@
 x 2020-12-06 2020-12-06 move todos to .todo
 x 2020-12-06 2020-12-06 Make this a legit module already
+x 2020-12-07 2020-12-06 get USER and REPO from git config (git remote get-url origin)
+x 2020-12-07 2020-12-06 move DATA_DIR out of python-class/tmp
+x 2020-12-07 2020-12-06 make SRC_DIR and DATA_DIR configurable
+x 2020-12-07 2020-12-06 Review color modules (colorama, colorful, blessed), remove unneeded
+x 2020-12-07 2020-12-06 make user errors pretty ("No repo found.")
