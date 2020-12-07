@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "ghp"
+version = "0.1.0"
+description = "CLI utility for querying the Github API for status of Pages/Actions"
+authors = ["Alissa Huskey <alissa.huskey@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+blessed = "^1.17.12"
+click = "^7.1.2"
+tabulate = "^0.8.7"
+ipython = "^7.19.0"
+more_itertools = "^8.6.0"
+colorful = "^0.5.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[tool.poetry.scripts]
+status = "ghp.cli:main"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
