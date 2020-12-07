@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# fail on errors, even within pipes
+set -Eeo pipefail
+
+msg() {
+  printf "\e[33m>\e[0m %s...\n" "${*}"
+}
+
+info() {
+  if [[ -z "${is_verbose}" ]]; then
+    return
+  fi
+  printf "\e[2m> %s\e[0m\n" "${*}"
+}
+
+abort() {
+  printf "\e[31mError\e[0m %s\n" "${*}" >&2
+  exit 1
+}
+
+run() {
+  printf "\e[2mcmd> %s\e[0m\n" "${*}"
+
+  if [[ -n "${is_dryrun}" ]]; then
+    echo
+    return
+  fi
+
+   "${@}" || abort "Command failed: ${*}"
+   echo
+}
+
+ensure_clean() {
+  local changed
+  if [[ -n "${is_dryrun}" ]]; then
+    return
+  fi
+
+  read -r changed < <(git status -s)
+
+  [[ -z "${changed}" ]]
+}
+
+usage() {
+  echo "publish -- build and push to origin/release"
+  echo
+  echo "usage: publish [--verbose] [--dry-run]"
+}
+
+main() {
+  local branch is_dryrun is_verbose
+
+  if [[ "${*}" =~ --help|-h|help ]]; then
+    usage
+    exit
+  fi
+
+  if [[ "${*}" =~ --verbose|-v ]]; then
+    is_verbose=yes
+  fi
+
+  if [[ "${*}" =~ --dry-run|-d ]]; then
+    is_dryrun=yes
+  fi
+
+  read -r branch < <(git branch --show-current)
+
+  git fetch || abort "Could not fetch."
+
+  info "dry run : ${is_dryrun:-no}"
+  info "branch  : $branch"
+
+  ensure_clean || abort "${branch} is dirty, unable to switch to release"
+
+  msg "Checking out relase branch"
+  run git checkout release || abort "Could not checkout the release branch."
+
+  msg "Merging master"
+  run git merge --ff master || abort "Failed to merge changes from master"
+
+  msg "Building"
+  run poetry build || abort "poetry build failed"
+
+  msg "Staging dist/"
+  run git add dist || abort
+
+  msg "Preparing to commit"
+  if ! read -p "commit message: " -r message; then
+    echo "Cannot continue without a commit message. Canceling."
+    exit
+  fi
+
+  msg "Commiting"
+  run git commit -am "${message}" || abort "Could not commit."
+
+  ensure_clean || abort "${branch} is dirty. Resolve and commit with --amend before pushing."
+
+  msg "Pushing"
+  run git push || abort "Could not push."
+
+  msg "Checking out master branch"
+  run git checkout master || abort "Could not checkout the master branch."
+}
+
+main ${1:+"$@"}
