@@ -199,7 +199,7 @@ class Request(ABC, Downloadable):
            Uses the `gh` CLI tool to avoid dealing with authentication.
            Raises CalledProcessError if the request fails.
         """
-        result = shell_run(["gh", "api", f"/repos/{App.APP.repo}/{self.endpoint}"],
+        result = shell_run(["gh", "api", f"repos/{App.APP.repo}/{self.endpoint}"],
                      capture_output=True)
         result.check_returncode()
         data = json.loads(result.stdout.decode())
@@ -362,10 +362,16 @@ class JobsRequest(ChildRequest, Finite):
 
     dirname: str = "jobs"
 
+    def mklog(self, data):
+        """Return a Job object for data"""
+        job = Job(data, self.parent)
+        job.log_request = JobLogRequest(job)
+        return job
+
     @property
     def data(self):
         """Set data to a list of Job objects."""
-        return [ Job(x, self.parent) for x in self.request_data["jobs"] ]
+        return [ self.mklog(x) for x in self.request_data["jobs"] ]
 
     @property
     def endpoint(self):

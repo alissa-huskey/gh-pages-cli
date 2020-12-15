@@ -239,11 +239,6 @@ class Job(ChildObject):
         return f"https://github.com/{App.APP.repo}/runs/{self.id}?check_suite_focus=true"
 
     @cached_property
-    def log_request(self):
-        """Return the JobLogRequest object for this job."""
-        return JobLogRequest(self)
-
-    @cached_property
     def log(self):
         """Return the Log object for this Job"""
         return self.log_request.data

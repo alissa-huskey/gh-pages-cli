@@ -74,8 +74,8 @@ class Status(AbstractState):
     """
     error        = (1, Ok.fail)
     failure      = (2, Ok.fail)
-    pending      = (3, Ok.busy)
-    in_progress  = (4, Ok.busy)
-    queued       = (5, Ok.busy)
-    success      = (6, Ok.ok)
-
+    skipped      = (3, Ok.fail)
+    pending      = (4, Ok.busy)
+    in_progress  = (5, Ok.busy)
+    queued       = (6, Ok.busy)
+    success      = (7, Ok.ok)
