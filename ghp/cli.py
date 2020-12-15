@@ -11,6 +11,7 @@ import tabulate as tabulate_module
 from tabulate import tabulate
 
 from .app import App
+from .objects import LogLine
 from .requests import (CommitRequest, DeploysRequest, JobsRequest,
                        JobLogRequest, PagesRequest, PagesBuildsRequest,
                        RunsRequest, StatusRequest)
@@ -272,7 +273,7 @@ def show_failed_job_stats(job):
         ("Run", f"[{style(job.parent.status.name, fg='red')}] {job.parent.id}"),
         ("Job", f"[{style(job.status.name, fg='red')}] {job.id}"),
         ("Step", f"[{style(job.last_step.status.name, fg='red')}] {app.style.step(job.last_step, len(str(job.last_step.number)))}"),
-        ("Log", str(job.log_request.filepath.relative_to(Path.cwd())).ljust(minwidth)),
+        ("Log", str(job.log_request.filepath.relative_to(App.APP.data_dir)).ljust(minwidth)),
         ("URL", app.term.link(job.url, f"{App.APP.repo} > actions")),
     ]
 

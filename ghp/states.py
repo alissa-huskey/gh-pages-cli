@@ -18,6 +18,10 @@ class Ok(IntEnum):
     fail   = -1  # error, failure
     error  = -2  # invalid state name
 
+    def __bool__(self):
+        """Return True for truthy Ok status"""
+        return self.value > 0
+
 
 # error, failure, pending, in_progress, queued, or success
 # queued, in_progress, or completed.
@@ -70,8 +74,8 @@ class Status(AbstractState):
     """
     error        = (1, Ok.fail)
     failure      = (2, Ok.fail)
-    pending      = (3, Ok.busy)
-    in_progress  = (4, Ok.busy)
-    queued       = (5, Ok.busy)
-    success      = (6, Ok.ok)
-
+    skipped      = (3, Ok.fail)
+    pending      = (4, Ok.busy)
+    in_progress  = (5, Ok.busy)
+    queued       = (6, Ok.busy)
+    success      = (7, Ok.ok)

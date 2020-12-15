@@ -152,7 +152,6 @@ class Deploy(Object):
             master_sha=(None, True, Sha),
         )
 
-
     @cached_property
     def commit(self):
         """Return Commit object"""
@@ -238,11 +237,6 @@ class Job(ChildObject):
     def url(self):
         """Return the URL to view the Job on github.com"""
         return f"https://github.com/{App.APP.repo}/runs/{self.id}?check_suite_focus=true"
-
-    @cached_property
-    def log_request(self):
-        """Return the JobLogRequest object for this job."""
-        return JobLogRequest(self)
 
     @cached_property
     def log(self):
