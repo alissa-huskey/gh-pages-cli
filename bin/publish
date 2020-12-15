@@ -85,14 +85,16 @@ main() {
   msg "Staging dist/"
   run git add dist || abort
 
-  msg "Preparing to commit"
-  if ! read -p "commit message: " -r message; then
-    echo "Cannot continue without a commit message. Canceling."
-    exit
-  fi
+  if [[ -n "$(git st -s)" ]]; then
+    msg "Preparing to commit"
+    if ! read -p "commit message: " -r message; then
+      echo "Cannot continue without a commit message. Canceling."
+      exit
+    fi
 
-  msg "Commiting"
-  run git commit -am "${message}" || abort "Could not commit."
+    msg "Commiting"
+    run git commit -am "${message}" || abort "Could not commit."
+  fi
 
   ensure_clean || abort "${branch} is dirty. Resolve and commit with --amend before pushing."
 
