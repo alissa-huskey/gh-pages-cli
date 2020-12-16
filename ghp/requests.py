@@ -146,7 +146,7 @@ class Request(ABC, Downloadable):
            request type that follows {App.APP.repo}.
 
            For example, if the full endpoint for the class was:
-           /repos/{owner}/{repo}/commits/{ref}
+           repos/{owner}/{repo}/commits/{ref}
 
            This method would return:
            f"commits/{ref}"
@@ -338,7 +338,7 @@ class JobLogRequest(ChildRequest, Finite):
         """
         with self.filepath.open("w") as fp:
             result = shell_run(
-                ["gh", "api", f"/repos/{App.APP.repo}/{self.endpoint}"],
+                ["gh", "api", f"repos/{App.APP.repo}/{self.endpoint}"],
                 stdout=fp)
             result.check_returncode()
 
