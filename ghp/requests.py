@@ -1,11 +1,15 @@
 """Requests module -- Classes for making requests to the Github API"""
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from functools import cached_property
 import json
 from subprocess import run as shell_run
 
+import requests
+
 from .app import App
+from .downloadable import Dynamic, Finite, Additive, Static
 from .objects import (Commit, Deploy, DeployStatus, Job, Log, LogLine, Pages,
                       PagesBuild, Run, Step)
 from .types import Sha
@@ -22,68 +26,32 @@ __all__ = [
     "StatusRequest",
 ]
 
+class RequestError():
+    def __init__(self, response):
+        """Initializer"""
+        data = response.json()
+        self.code = response.status_code
+        self.reason = response.reason
+        self.message = data.get("message")
+        self.docs = data.get("documentation_url")
 
-class Downloadable():
-    """Abstract base class to provide should_refresh method."""
-
-    @property
-    @abstractmethod
-    def should_refresh(self):
-        """Return True if this particular the file for this particular request
-           should be re-downloaded."""
-        raise Exception("Should be defined in inherting classes.")
-
-
-class Dynamic(Downloadable):
-    """For requests that respond with data that is a snapshot in time."""
-
-    @property
-    def should_refresh(self):
-        """True if --refresh unless just downloaded"""
-        return not self.downloaded and App.APP.refresh
-
-
-class Finite(Downloadable):
-    """For requests that respond with data for a single object which may be
-       modified until it is closed."""
-
-    @property
-    def should_refresh(self):
-        """True for open objects unless --local or just downloaded"""
-        if App.APP.force_local or self.downloaded:
-            return False
-
-        return self.is_open
-
-
-class Additive(Downloadable):
-    """For requests that respond with a list of Finite object which may be
-       added to."""
-
-    @property
-    def should_refresh(self):
-        """True if --refresh or if any member objects are open, unless --local
-           or just downloaded."""
-        if App.APP.force_local or self.downloaded:
-            return False
-
-        return self.is_open or App.APP.refresh
-
-
-class Static(Downloadable):
-    """For requests that do not change once downloaded."""
-
-    @property
-    def should_refresh(self):
-        """Never refresh."""
-        return False
-
-
-class Request(ABC, Downloadable):
+class Request(ABC):
     """Abstract base class for requests to the Github API."""
 
     """Application object"""
     APP: App
+
+    """Github API base URL"""
+    BASE_URL: str = "https://api.github.com"
+
+    """Github API Version"""
+    API_VERSION: int = 3
+
+    """Request type"""
+    method: str = "GET"
+
+    """Accept header media type"""
+    media: str = "json"
 
     """Name of the directory under {App.data_dir} to store json files."""
     dirname: str
@@ -99,6 +67,8 @@ class Request(ABC, Downloadable):
            Create any missing directories and load JSON data, making an API
            request to download it first if needed.
         """
+        self.error = None
+        self.response = None
         self.downloaded = False
         if not self.dirpath.is_dir():
           self.dirpath.mkdir(parents=True)
@@ -108,19 +78,33 @@ class Request(ABC, Downloadable):
         """Return repr string containing endpoint"""
         return f"{self.__class__.__name__}({self.endpoint})"
 
+    @cached_property
+    def headers(self):
+        """Request headers"""
+        return {
+            'Authorization': f"token {App.APP.token}",
+            'Accept': f"application/vnd.github.v{self.API_VERSION}+{self.media}",
+        }
+
     def get(self):
-        """Load JSON data, making an API request to download it first if
-           needed.
-        """
-        if not self.exists():
-            self.download()
-
-        self.load()
-
-        if self.should_refresh:
-            App.APP.msg("Refreshing", self.endpoint)
-            self.download()
+        """Load JSON data, making an API request to download if needed."""
+        if self.exists():
             self.load()
+        else:
+            self.download()
+            self.write()
+        self.refresh()
+
+    def refresh(self):
+        """Download new data if needed"""
+        if not self.should_refresh:
+            return
+
+        App.APP.msg("Refreshing", self.endpoint)
+        self.download()
+        self.store()
+        self._filepath = self.default_filepath
+        self.write()
 
     @property
     def is_open(self) -> bool:
@@ -168,43 +152,72 @@ class Request(ABC, Downloadable):
            Not cached, as it will need to be refreshed after a new file has
            been created using self.download().
         """
-        files = list(self.dirpath.glob("*.json"))
-        files.sort(reverse=True)
-        return files
+        files = [f for f in self.dirpath.glob("*.json") if f.stat().st_size]
+        return sorted(files, reverse=True)
 
     @property
     def default_filepath(self):
         """Returns a Path object to the file to create."""
-        return self.dirpath.joinpath(f"{TODAY}.json")
+        return self.dirpath.joinpath(f"{self.today}.json")
 
-    @cached_property
+    @property
     def filepath(self):
-        """Returns a Path object to either an existing file or the file to
+        """Return a Path object to either an existing file or the file to
            create."""
-        if self.files:
-          return self.files[0]
+        if "_filepath" not in self.__dict__:
+            if self.files:
+                self._filepath = self.files[0]
+            else:
+                self._filepath = self.default_filepath
+        return self._filepath
 
-        return self.default_filepath
+    @filepath.setter
+    def filepath(self, value):
+        """self.filepath setter"""
+        self._filepath = value
 
     def load(self):
-        """Load self.data from the most recent .json file in self.dirpath"""
+        """Load self.request_data from the self.filepath"""
         if not self.filepath.is_file():
           return
 
         with self.filepath.open() as fp:
           self.request_data = json.load(fp)
 
+    @property
+    def url(self):
+        """Github API full url"""
+        return f"{self.BASE_URL}/repos/{App.APP.repo}/{self.endpoint}"
+
+    def request(self):
+        """Make Github API request"""
+        App.APP.info(self.endpoint, prefix=f"{self.__class__.__name__} requesting")
+        self.response = requests.request(self.method, self.url, headers=self.headers)
+        if not self.response.ok:
+            self.error = RequestError(self.response)
+            return
+
+    def store(self):
+        """Save self.request_data"""
+        self.request_data = self.response.json()
+
     def download(self):
-        """Make a request to the Github API then save the resulting json file.
-           Uses the `gh` CLI tool to avoid dealing with authentication.
-           Raises CalledProcessError if the request fails.
+        """Make a request to the Github API and store results to
+           self.request_data
         """
-        result = shell_run(["gh", "api", f"repos/{App.APP.repo}/{self.endpoint}"],
-                     capture_output=True)
-        result.check_returncode()
-        data = json.loads(result.stdout.decode())
+        self.request()
+        self.store()
+
+    def write(self):
+        """Write self.request_data json file."""
+        App.APP.info(self.filepath, prefix="Writing file")
         with self.filepath.open("w") as fp:
-          json.dump(data, fp)
+          json.dump(self.request_data, fp, indent=2)
+
+    @cached_property
+    def today(self):
+        """Return date string formatted for filename"""
+        return datetime.today().strftime("%Y-%m-%d-%s")
 
 
 class ChildRequest(Request):
@@ -273,6 +286,7 @@ class DeploysRequest(Request, Additive):
     """
 
     dirname: str = "deploys"
+    endpoint: str = "deployments"
 
     def mkdeploy(self, data):
         """Returns a Deploy object for data"""
@@ -286,27 +300,18 @@ class DeploysRequest(Request, Additive):
         """Returns a list of Deploy objects."""
         return [ self.mkdeploy(x) for x in self.request_data ]
 
-    @property
-    def endpoint(self):
-        """deployments endpoint"""
-        return "deployments"
-
 
 class PagesRequest(Request, Dynamic):
     """Class for github pages requests.
        https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#pages
     """
     dirname: str = "pages"
+    endpoint: str = "pages"
 
     @property
     def data(self):
         """Returns a Pages object."""
         return Pages(self.request_data)
-
-    @property
-    def endpoint(self):
-        """API endpoint following App.repo"""
-        return "pages"
 
 
 class JobLogRequest(ChildRequest, Finite):
@@ -315,6 +320,7 @@ class JobLogRequest(ChildRequest, Finite):
     """
 
     dirname: str = "logs"
+    media: str = "raw"
 
     @property
     def endpoint(self):
@@ -331,16 +337,14 @@ class JobLogRequest(ChildRequest, Finite):
         """Return Log object"""
         return Log(self.parent, self.request_data)
 
-    def download(self):
-        """Make a request to the Github API then save the resulting text file.
-           Uses the `gh` CLI tool to avoid dealing with authentication.
-           Raises CalledProcessError if the request fails.
-        """
-        with self.filepath.open("w") as fp:
-            result = shell_run(
-                ["gh", "api", f"repos/{App.APP.repo}/{self.endpoint}"],
-                stdout=fp)
-            result.check_returncode()
+    def write(self):
+        """Write self.request_data log file."""
+        with self.filepath.open("w", encoding="ascii") as fp:
+            fp.write(self.request_data)
+
+    def store(self):
+        """Save self.request_data"""
+        self.request_data = self.response.text.splitlines()
 
     @property
     def filepath(self):
@@ -350,7 +354,7 @@ class JobLogRequest(ChildRequest, Finite):
     def load(self):
         """Read the logfile lines into self.request_data"""
         if not self.filepath.is_file():
-          return
+            return
         with self.filepath.open() as fp:
             self.request_data = fp.readlines()
 
@@ -385,16 +389,12 @@ class PagesBuildsRequest(Request, Additive):
     """
 
     dirname: str = "builds"
+    endpoint: str = "pages/builds"
 
     @property
     def data(self):
         """Returns a list of Deploy objects."""
         return [ PagesBuild(x) for x in self.request_data ]
-
-    @property
-    def endpoint(self):
-        """pages builds endpoint"""
-        return "pages/builds"
 
 
 class RunsRequest(Request, Additive):
@@ -403,6 +403,7 @@ class RunsRequest(Request, Additive):
     """
 
     dirname: str = "runs"
+    endpoint: str = "actions/runs"
 
     def mkrun(self, data):
         """Create a Run object for data"""
@@ -414,11 +415,6 @@ class RunsRequest(Request, Additive):
     def data(self):
         """Returns a list of Run objects."""
         return [ self.mkrun(x) for x in self.request_data["workflow_runs"] ]
-
-    @property
-    def endpoint(self):
-        """Runs endpoint."""
-        return "actions/runs"
 
 
 class StatusRequest(ChildRequest, Finite):

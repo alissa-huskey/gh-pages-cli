@@ -285,6 +285,9 @@ def show_failed_job_stats(job):
 @click.command()
 @click.option("--repo", "-r",
               help="Github repo connected to Github Pages. (ie 'executablebooks/jupyter-book')")
+@click.option("--path", "-p", default=".",
+              type=click.Path(exists=True, file_okay=False, resolve_path=True),
+              help="Path to local checkout of github repo.")
 @click.option("--data-root", "-d",
               help="Where to save downloaded data files.")
 @click.option("--local", "-l", is_flag=True, default=False,

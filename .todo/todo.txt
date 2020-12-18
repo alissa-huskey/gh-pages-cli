@@ -11,3 +11,5 @@
 2020-12-06 make path output pretty (ie. data root)
 2020-12-07 add a config command
 2020-12-07 doctest
+2020-12-17 add --path flag
+2020-12-17 add --token flag

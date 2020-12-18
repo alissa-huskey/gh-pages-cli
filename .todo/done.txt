@@ -5,3 +5,4 @@ x 2020-12-07 2020-12-06 move DATA_DIR out of python-class/tmp
 x 2020-12-07 2020-12-06 make SRC_DIR and DATA_DIR configurable
 x 2020-12-07 2020-12-06 Review color modules (colorama, colorful, blessed), remove unneeded
 x 2020-12-07 2020-12-06 make user errors pretty ("No repo found.")
+x 2020-12-18 2020-12-17 migrate to use requests

@@ -1,7 +1,9 @@
 """App module"""
 
+from configparser import ConfigParser
 from functools import cached_property
 from itertools import chain
+from os import environ
 from pathlib import Path
 import re
 from subprocess import run as shell_run
@@ -11,6 +13,7 @@ from typing import Any
 from blessed.terminal import Terminal
 import click
 from click import style
+
 from more_itertools import always_iterable
 
 from .states import Ok
@@ -25,13 +28,14 @@ class App():
     """Application object"""
     APP: Any
 
-    def __init__(self, repo=None, data_root=None, local=False, refresh=False, verbose=False):
+    def __init__(self, repo=None, path=None, data_root=None, local=False, refresh=False, verbose=False):
         """Initializer
            Set option attrubites and print messages about enabled options.
         """
         # set attrs from options
         self.data_root = data_root
         self.repo = repo
+        self.repo_path = path
         self.force_local = local
         self.refresh = refresh
         self.verbose = verbose
@@ -48,50 +52,73 @@ class App():
 
         # user messages
         self.info(self.repo, prefix="Repo")
+        self.info(self.repo_path, prefix="Repo Path")
         self.msg(self.style.mode("verbose", self.verbose))
         self.msg(self.style.mode("local", self.force_local))
         self.msg(self.style.mode("refresh", self.refresh))
 
     @property
-    def repo(self):
-        """Return _repo"""
-        return self._repo
+    def gitcfg(self):
+        """Return ConfigParser object for .git/config file"""
+        cfg = ConfigParser()
+        cfg_file = self.repo_path.joinpath(".git", "config")
+        if cfg_file.exists():
+            cfg.read(cfg_file)
+        return cfg
 
-    @repo.setter
-    def repo(self, value: str):
-        """Set _repo. default: parse from url of origin remote
+    @property
+    def repo(self):
+        """Return user/repo parsed from self._repo
+        default: git remote get-url origin or GITHUB_REPOSITORY
         accepts strings like:
             - alissa-huskey/python-class
             - https://github.com/mgutz/ansi
             - git@github.com:alissa-huskey/gh-pages-cli.git
             - https://github.com/bats-core/bats-core.git
         """
-        # get the default value from remote origin url in current dir
-        if not value:
-            res = shell_run(["git", "remote", "get-url", "origin"],
-                              capture_output=True)
-            if res.returncode != 0:
-                return
-            value = res.stdout.decode().strip()
+
+        # fallback to remote origin url from .git/config file in repo_path
+        if not self._repo:
+            self._repo = self.gitcfg.get('remote "origin"', "url", fallback="")
+
+        # fallback to GITHUB_REPOSITORY env var
+        if not self._repo:
+            self._repo = environ.get("GITHUB_REPOSITORY", "")
 
         # remove trailing .git
-        if value.endswith(".git"):
-            value = value[:-4]
+        if self._repo.endswith(".git"):
+            self._repo = self._repo[:-4]
 
         # parse repo from full URI
-        if match := re.search(r"github.com[/:](?P<repo>.+)$", value):
-            value = match.group("repo")
+        if match := re.search(r"github.com[/:](?P<repo>.+)$", self._repo):
+            self._repo = match.group("repo")
 
-        if not value:
-            self.abort("Repo is not set, and unable to get from git.\n"
+        if not self._repo:
+            self.abort("Repo is not set, and unable to get from .git/config.\n"
                        "      Please set GHP_REPO env var or use the --repo flag.")
 
-        self._repo = value
+        return self._repo
+
+    @repo.setter
+    def repo(self, value: str):
+        """Set _repo
+           accepts strings like:
+            - alissa-huskey/python-class
+            - https://github.com/mgutz/ansi
+            - git@github.com:alissa-huskey/gh-pages-cli.git
+            - https://github.com/bats-core/bats-core.git
+        """
+        self._repo = value.strip()
 
     @property
     def data_root(self):
         """Return _data_root"""
         return self._data_root
+
+    @property
+    def token(self):
+        """Return GITHUB_TOKEN"""
+        return environ.get("GITHUB_TOKEN")
 
     @data_root.setter
     def data_root(self, value):
@@ -121,6 +148,7 @@ class App():
         text = " ".join(args)
         print(style(">", fg="cyan"), style(text, fg="bright_black", bold=False))
 
+
     def info(self, *args, multi=False, prefix=None):
         """Print info message if in verbose mode.
 
@@ -144,7 +172,7 @@ class App():
         if prefix:
             line.append(style("{:<12}".format(prefix), fg="yellow"))
 
-        text = style(" ".join(args), fg="bright_black")
+        text = style(" ".join(map(str, args)), fg="bright_black")
         print(*line, text, file=stderr)
 
     def abort(self, *args):
