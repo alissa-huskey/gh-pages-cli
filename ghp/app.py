@@ -6,7 +6,6 @@ from itertools import chain
 from os import environ
 from pathlib import Path
 import re
-from subprocess import run as shell_run
 from sys import stderr
 from typing import Any
 
@@ -33,9 +32,10 @@ class App():
            Set option attrubites and print messages about enabled options.
         """
         # set attrs from options
+        self._init_attrs_()
         self.data_root = data_root
-        self.repo = repo
         self.repo_path = path
+        self.repo = repo
         self.force_local = local
         self.refresh = refresh
         self.verbose = verbose
@@ -56,6 +56,10 @@ class App():
         self.msg(self.style.mode("verbose", self.verbose))
         self.msg(self.style.mode("local", self.force_local))
         self.msg(self.style.mode("refresh", self.refresh))
+
+    def _init_attrs_(self):
+        for attr in ("repo", "data_root", "indentation"):
+            setattr(self, f"_{attr}", None)
 
     @property
     def gitcfg(self):
@@ -108,7 +112,7 @@ class App():
             - git@github.com:alissa-huskey/gh-pages-cli.git
             - https://github.com/bats-core/bats-core.git
         """
-        self._repo = value.strip()
+        self._repo = str(value).strip()
 
     @property
     def data_root(self):
@@ -346,3 +350,5 @@ class Style():
         if step:
             num, desc = step.number, step.desc[0:20]
         return f"{num:>{width}} {desc}"
+
+App.APP = App()

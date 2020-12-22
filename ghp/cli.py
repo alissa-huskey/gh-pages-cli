@@ -18,57 +18,6 @@ from .requests import (CommitRequest, DeploysRequest, JobsRequest,
 from .states import Ok
 
 
-def debug(app):
-    """Print a bunch of debug info."""
-    deploys = DeploysRequest()
-    statuses = StatusRequest(deploys.data[0])
-    runs = RunsRequest()
-    run = runs.data[0]
-    job = run.jobs[0]
-    step = job.steps[0]
-    commit_req = CommitRequest("dfe4c0a60db827a8576bb510f99d574f9a42be4d")
-    commit = commit_req.data
-    status = Status("success")
-    progress = Progress("completed")
-    builds = PagesBuildsRequest()
-    build = builds.data[0]
-
-    app.info(deploys.dirname, prefix="deploys.dirname")
-    app.info(deploys.dirpath, prefix="deploys.dirpath")
-    app.info(deploys.filepath, prefix="deploys.filepath")
-    app.info(deploys.endpoint, prefix="deploys.endpoint")
-    app.info(deploys.data[0], prefix="Deploy")
-
-    app.info(statuses.dirname, prefix="statuses.dirname")
-    app.info(statuses.dirpath, prefix="statuses.dirpath")
-    app.info(statuses.filepath, prefix="statuses.filepath")
-    app.info(statuses.endpoint, prefix="statuses.endpoint")
-    app.info(statuses.data[0], prefix="DeployStatus")
-
-    app.info(runs.dirname, prefix="runs.dirname")
-    app.info(runs.dirpath, prefix="runs.dirpath")
-    app.info(runs.filepath, prefix="runs.filepath")
-    app.info(runs.endpoint, prefix="runs.endpoint")
-    app.info(runs.data[0], prefix="Run")
-
-    app.info( run.jobs_request.dirname, prefix="jobs.dirname")
-    app.info( run.jobs_request.dirpath, prefix="jobs.dirpath")
-    app.info(run.jobs_request.filepath, prefix="jobs.filepath")
-    app.info(run.jobs_request.endpoint, prefix="jobs.endpoint")
-    app.info(job, prefix="Job")
-
-    app.info( run.jobs_request.dirname, prefix="jobs.dirname")
-    app.info( run.jobs_request.dirpath, prefix="jobs.dirpath")
-    app.info(run.jobs_request.filepath, prefix="jobs.filepath")
-    app.info(run.jobs_request.endpoint, prefix="jobs.endpoint")
-    app.info(step, prefix="Step")
-    app.info(commit, prefix="Commit")
-    app.info(Ok.ok, prefix="Ok")
-    app.info(status, status.ok, prefix="Status")
-    app.info(progress, progress.ok, prefix="Progress")
-    app.info(build, prefix="Build")
-
-
 def show_pages(obj):
     """Print the Github Pages details to buffer.
     Params
@@ -300,7 +249,6 @@ def main(**kwargs):
     """Show status information about Gihub Pages and Actions"""
     app = App(**kwargs)
     tabulate_module.PRESERVE_WHITESPACE = True
-    #  debug(app)
 
     pages = PagesRequest()
     deploys = DeploysRequest()

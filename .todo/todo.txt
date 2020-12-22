@@ -13,3 +13,6 @@
 2020-12-07 doctest
 2020-12-17 add --path flag
 2020-12-17 add --token flag
+2020-12-22 add GITHUB_REPOSITORY and GITHUB_USER click flags
+2020-12-22 refactor LogRequest.request_data (lines vs read)
+2020-12-22 handle blank repo better

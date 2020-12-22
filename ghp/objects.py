@@ -45,7 +45,7 @@ class Object(ABC):
         else:
             return f"{self.__class__.__name__}()"
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict = {}):
         """Initializer
            Extracts the values from the {data} dict as defined in by {self.fields}.
 
@@ -101,7 +101,7 @@ class Object(ABC):
 class ChildObject(Object):
     """Base class for objects that need to keep track of their parent object."""
 
-    def __init__(self, data, parent):
+    def __init__(self, parent, data: dict = {}):
         """Initializer
            Assigns self.parent
 
@@ -221,7 +221,7 @@ class Job(ChildObject):
     @property
     def steps(self) -> list:
         """Return list of Step objects for this job"""
-        return [Step(x, self) for x in self.request_data["steps"]]
+        return [Step(self, x) for x in self.request_data["steps"]]
 
     @property
     def last_step(self) -> str:

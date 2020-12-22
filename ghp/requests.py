@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from functools import cached_property
 import json
-from subprocess import run as shell_run
 
 import requests
 
@@ -344,7 +343,7 @@ class JobLogRequest(ChildRequest, Finite):
 
     def store(self):
         """Save self.request_data"""
-        self.request_data = self.response.text.splitlines()
+        self.request_data = "\n".join(self.response.text.splitlines())
 
     @property
     def filepath(self):
@@ -356,7 +355,7 @@ class JobLogRequest(ChildRequest, Finite):
         if not self.filepath.is_file():
             return
         with self.filepath.open() as fp:
-            self.request_data = fp.readlines()
+            self.request_data = "\n".join(fp.readlines())
 
 
 class JobsRequest(ChildRequest, Finite):
@@ -368,7 +367,7 @@ class JobsRequest(ChildRequest, Finite):
 
     def mklog(self, data):
         """Return a Job object for data"""
-        job = Job(data, self.parent)
+        job = Job(self.parent, data)
         job.log_request = JobLogRequest(job)
         return job
 
