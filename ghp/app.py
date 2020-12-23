@@ -27,7 +27,7 @@ class App():
     """Application object"""
     APP: Any
 
-    def __init__(self, repo=None, path=None, data_root=None, local=False, refresh=False, verbose=False):
+    def __init__(self, repo=None, path=".", data_root=None, local=False, refresh=False, verbose=False):
         """Initializer
            Set option attrubites and print messages about enabled options.
         """
@@ -58,16 +58,34 @@ class App():
         self.msg(self.style.mode("refresh", self.refresh))
 
     def _init_attrs_(self):
-        for attr in ("repo", "data_root", "indentation"):
+        for attr in ("repo", "data_root", "indentation", "repo_path"):
             setattr(self, f"_{attr}", None)
+
+    @property
+    def repo_path(self):
+        """repo_path property"""
+        return self._repo_path
+
+    @repo_path.setter
+    def repo_path(self, value):
+        """set _repo_path to Path object"""
+        if isinstance(value, str):
+            value = Path(value)
+        if isinstance(value, Path):
+            value = value.absolute()
+        self._repo_path = value
+
+    @property
+    def gitcfg_file(self):
+        """Return ConfigParser object for .git/config file"""
+        return self.repo_path.joinpath(".git", "config")
 
     @property
     def gitcfg(self):
         """Return ConfigParser object for .git/config file"""
         cfg = ConfigParser()
-        cfg_file = self.repo_path.joinpath(".git", "config")
-        if cfg_file.exists():
-            cfg.read(cfg_file)
+        if self.gitcfg_file.exists():
+            cfg.read(self.gitcfg_file)
         return cfg
 
     @property
@@ -112,17 +130,14 @@ class App():
             - git@github.com:alissa-huskey/gh-pages-cli.git
             - https://github.com/bats-core/bats-core.git
         """
-        self._repo = str(value).strip()
+        if not value:
+            value = ""
+        self._repo = value.strip()
 
     @property
     def data_root(self):
         """Return _data_root"""
         return self._data_root
-
-    @property
-    def token(self):
-        """Return GITHUB_TOKEN"""
-        return environ.get("GITHUB_TOKEN")
 
     @data_root.setter
     def data_root(self, value):
@@ -136,6 +151,11 @@ class App():
             abort(f"Invalid path to data_root: {value}")
 
         self._data_root = value
+
+    @property
+    def token(self):
+        """Return GITHUB_TOKEN"""
+        return environ.get("GITHUB_TOKEN")
 
     @property
     def data_dir(self):

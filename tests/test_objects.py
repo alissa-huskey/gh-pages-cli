@@ -1,42 +1,42 @@
 import pytest
+
 from ghp.objects import (Commit, Deploy, DeployStatus, Job, Log, LogLine,
                          Object, Pages, PagesBuild, Run, Step, rget)
 from ghp.states import Progress, Status
 from ghp.types import Sha, Date
 
 
-def mkstub(**kwargs):
-    """Return a Stub object"""
-    klass = kwargs.get("klass")
-    class Stub(): ...
-    if klass:
-        Stub.__name__ = f"{klass}Stub"
-    obj = Stub()
-    for k,v in kwargs.items():
-        setattr(obj, k, v)
-    return obj
+@pytest.fixture
+def subclass(request):
+    """Return a Object subclass"""
 
+    try:
+        params = request.param
+    except AttributeError:
+        params = {}
 
-def mkclass(fields={}, name="TestObject"):
-    """Make a Object subclass"""
     class TestObject(Object):
         @property
         def fields(self):
-            return fields
-    TestObject.__name__ = name
+            return params.get("fields", {})
+    TestObject.__name__ = params.get("name", "TestObject")
     return TestObject
 
 
-def test_fields_mapping():
-    """Object.__init__ extracts values according to Object.fields and
-       Object.__repr__ includes values as specified in Object.fields"""
-
-    klass = mkclass(dict(
+@pytest.mark.parametrize(
+    "subclass",
+     [{'fields': dict(
         id=("id", True),
         author=("author.name", False),
         letters=("letters", False, list)
-    ))
-    t = klass({'id': 10, 'author': {'name': "X"}, 'letters': "abc"})
+    )}],
+     indirect=True
+)
+def test_fields_mapping(subclass):
+    """Object.__init__ extracts values according to Object.fields and
+       Object.__repr__ includes values as specified in Object.fields"""
+
+    t = subclass({'id': 10, 'author': {'name': "X"}, 'letters': "abc"})
 
     assert repr(t) == "TestObject({'id': 10})"
     assert t.author == "X"
@@ -44,110 +44,104 @@ def test_fields_mapping():
     assert t.letters == ["a", "b", "c"]
 
 
-def test_states():
+def test_states(subclass):
     """Object.states returns a generator of all defined attrs progress, status"""
-    klass= mkclass()
-
-    t = klass()
+    t = subclass()
     assert list(t.states) == []
 
-    t = klass()
+    t = subclass()
     t.status = Status.queued
     assert list(t.states) == [t.status]
 
-    t = klass()
+    t = subclass()
     t.progress = Progress.in_progress
     assert list(t.states) == [t.progress]
 
-    t = klass()
+    t = subclass()
     t.status = Status.queued
     t.progress = Progress.in_progress
     assert sorted(list(t.states)) == sorted([t.progress, t.status])
 
 
-def test_is_ok():
+def test_is_ok(subclass):
     """Object.is_ok returns True if all states are Ok.ok"""
-    klass= mkclass()
-
-    t = klass()
+    t = subclass()
     assert t.is_ok, "is_ok is True if neither status nor progress is defined"
 
-    t = klass()
+    t = subclass()
     t.status = Status.success
     assert t.is_ok, \
         "is_ok is True if status.ok is True and no progress is defined"
 
-    t = klass()
+    t = subclass()
     t.status = Status.queued
     assert not t.is_ok, \
         "is_ok is False if status.ok is False and no progress is defined"
 
-    t = klass()
+    t = subclass()
     t.progress = Progress.completed
     assert t.is_ok, \
         "is_ok is True if progress.ok is True and no status is defined"
 
-    t = klass()
+    t = subclass()
     t.progress = Progress.in_progress
     assert not t.is_ok, \
         "is_ok is False if progress.ok is False and no status is defined"
 
-    t = klass()
+    t = subclass()
     t.status = Status.queued
     t.progress = Progress.in_progress
     assert not t.is_ok, \
         "is_ok is False if in_progress.ok and progress.ok are both False"
 
-    t = klass()
+    t = subclass()
     t.status = Status.success
     t.progress = Progress.in_progress
     assert not t.is_ok, \
         "is_ok is False if status.ok and progress.ok are both False"
 
-    t = klass()
+    t = subclass()
     t.status = Status.success
     t.progress = Progress.in_progress
     assert not t.is_ok, \
         "is_ok is False if status.ok is False and progress.ok is True"
 
-    t = klass()
+    t = subclass()
     t.status = Status.queued
     t.progress = Progress.completed
     assert not t.is_ok, \
         "is_ok is False if status.ok is False and progress.ok is True"
 
-    t = klass()
+    t = subclass()
     t.status = Status.success
     t.progress = Progress.completed
     assert t.is_ok, \
         "is_ok is True if status.ok and progress.ok are both True"
 
 
-def test_is_open():
+def test_is_open(subclass):
     """is_open returns True if any states None or Ok.busy"""
-    klass= mkclass()
-
-    t = klass()
+    t = subclass()
     assert not t.is_open, "is_open is False if states is empty"
 
-    t = klass()
+    t = subclass()
     t.status = None
     assert t.is_open, "is_open is True if any states are None"
 
-    t = klass()
+    t = subclass()
     t.status = Status.queued
     assert t.is_open, "is_open is True if any states are Ok.busy"
 
-    t = klass()
+    t = subclass()
     t.progress = Progress.in_progress
     assert t.is_open, "is_open is True if any states are Ok.busy"
 
-    t = klass()
+    t = subclass()
     t.status = Status.success
     t.progress = Progress.in_progress
     assert t.is_open, "is_open is True states include Ok.busy"
 
-    t = klass()
+    t = subclass()
     t.status = Status.success
     t.progress = Progress.completed
     assert not t.is_open, "is_open is False if all states are not Ok.busy"
@@ -188,8 +182,8 @@ def test_commit():
     assert repr(t) == "Commit({'sha': '0fd4c7e', 'date': Date(2020-11-27), 'author': 'John Doe'})"
 
 
-@pytest.mark.skip(reason="broken")
-def test_deploy():
+@pytest.mark.xfail
+def test_deploy(stub):
     #  id=("id", True),
     #  sha=("sha", True, Sha),
     #  date=("created_at", True, Date),
@@ -207,17 +201,17 @@ def test_deploy():
         'creator': {"login": "github-pages[bot]"},
     }
     message = "Update documentation"
-    commit = mkstub(body=message, message=message, klass="Commit")
-    deploy_status = mkstub(status="success", klass="DeployStatus")
-    deploy_status_request = mkstub( klass="DeployStatusRequest")
+    commit = stub(body=message, message=message, klass="Commit")
+    deploy_status = stub(status="success", klass="DeployStatus")
+    deploy_status_request = stub( klass="DeployStatusRequest")
     deploy_status_request.data = [deploy_status]
     deploy_status_list = [deploy_status_request]
-    deploy_status_list_request = mkstub(
+    deploy_status_list_request = stub(
         data=deploy_status_list,
         klass="DeployStatusListRequest")
 
     t = Deploy(data)
-    t.commit_request = mkstub(data=commit, klass="CommitRequest")
+    t.commit_request = stub(data=commit, klass="CommitRequest")
     t.deploy_status_list_request = deploy_status_list_request
 
     assert isinstance(t.sha, Sha)
