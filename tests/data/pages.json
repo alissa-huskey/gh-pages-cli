@@ -1,0 +1,12 @@
+{
+  "is_mock": true,
+  "url": "https://api.github.com/repos/alissa-huskey/python-class/pages",
+  "status": "built",
+  "cname": null,
+  "custom_404": false,
+  "html_url": "https://alissa-huskey.github.io/python-class/",
+  "source": {
+    "branch": "gh-pages",
+    "path": "/"
+  }
+}
